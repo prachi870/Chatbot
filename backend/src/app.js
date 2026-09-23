@@ -7,6 +7,7 @@ const { errorHandler, notFoundHandler } = require('./middleware/error.middleware
 const { generalLimiter } = require('./middleware/rateLimit.middleware');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // --- Core middleware ---
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
