@@ -6,9 +6,8 @@ const connectDB = require('./config/database');
 const PORT = process.env.PORT || 5000;
 
 async function start() {
-  // Skip MongoDB for now - use in-memory storage
-  console.log('⚠️  Running without MongoDB - data will not persist');
-  
+  await connectDB();
+
   const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
@@ -30,8 +29,3 @@ start().catch((error) => {
   console.error('Failed to start server:', error);
   process.exit(1);
 });
-
-
-
-
-

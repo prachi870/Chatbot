@@ -10,18 +10,11 @@ const app = express();
 app.set('trust proxy', 1);
 
 // --- Core middleware ---
-console.log('CORS configured to accept ALL origins (temporary for debugging)');
-
-// Add request logging
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url} - Origin: ${req.headers.origin || 'none'}`);
-  next();
-});
-
+const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 app.use(
   cors({
-    origin: '*', // Allow all origins temporarily
-    credentials: false,
+    origin: clientUrl,
+    credentials: true,
   })
 );
 app.use(express.json({ limit: '1mb' }));

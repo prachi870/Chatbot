@@ -1,11 +1,8 @@
 const bcrypt = require('bcryptjs');
+const User = require('../models/User');
 const { signToken } = require('../utils/jwt');
 
 const SALT_ROUNDS = 10;
-
-// In-memory storage for users (since MongoDB is not available)
-const usersDb = new Map();
-let userIdCounter = 1;
 
 class AppError extends Error {
   constructor(message, statusCode) {
@@ -15,79 +12,61 @@ class AppError extends Error {
 }
 
 /**
- * Creates a new user account (in-memory).
+ * Creates a new user account.
+ * Throws AppError(409) if the email is already registered.
  */
 async function signup({ name, email, password }) {
   const normalizedEmail = email.trim().toLowerCase();
 
-  // Check if user exists
-  for (const user of usersDb.values()) {
-    if (user.email === normalizedEmail) {
-      throw new AppError('An account with this email already exists.', 409);
-    }
+  const existing = await User.findOne({ email: normalizedEmail });
+  if (existing) {
+    throw new AppError('An account with this email already exists.', 409);
   }
 
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-  const user = {
-    _id: (userIdCounter++).toString(),
+  const user = await User.create({
     name: name.trim(),
     email: normalizedEmail,
     passwordHash,
-    createdAt: new Date(),
-  };
+  });
 
-  usersDb.set(user._id, user);
+  const token = signToken(user._id.toString());
 
-  const token = signToken(user._id);
-
-  // Return user without passwordHash
-  const { passwordHash: _, ...userWithoutPassword } = user;
-  return { token, user: userWithoutPassword };
+  return { token, user };
 }
 
 /**
- * Authenticates a user by email + password (in-memory).
+ * Authenticates a user by email + password.
+ * Throws AppError(401) on any failure (intentionally vague for security).
  */
 async function login({ email, password }) {
   const normalizedEmail = email.trim().toLowerCase();
 
-  let foundUser = null;
-  for (const user of usersDb.values()) {
-    if (user.email === normalizedEmail) {
-      foundUser = user;
-      break;
-    }
-  }
-
-  if (!foundUser) {
+  const user = await User.findOne({ email: normalizedEmail }).select('+passwordHash');
+  if (!user) {
     throw new AppError('Invalid email or password.', 401);
   }
 
-  const isMatch = await bcrypt.compare(password, foundUser.passwordHash);
+  const isMatch = await bcrypt.compare(password, user.passwordHash);
   if (!isMatch) {
     throw new AppError('Invalid email or password.', 401);
   }
 
-  const token = signToken(foundUser._id);
+  const token = signToken(user._id.toString());
 
-  // Return user without passwordHash
-  const { passwordHash: _, ...userWithoutPassword } = foundUser;
-  return { token, user: userWithoutPassword };
+  return { token, user };
 }
 
 /**
- * Fetches a user by id (in-memory).
+ * Fetches a user by id (used for GET /api/auth/me).
  */
 async function getUserById(userId) {
-  const user = usersDb.get(userId);
+  const user = await User.findById(userId);
   if (!user) {
     throw new AppError('User not found.', 404);
   }
-  
-  // Return user without passwordHash
-  const { passwordHash: _, ...userWithoutPassword } = user;
-  return userWithoutPassword;
+  return user;
 }
 
 module.exports = { signup, login, getUserById, AppError };
